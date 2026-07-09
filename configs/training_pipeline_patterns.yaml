@@ -1,0 +1,105 @@
+# 训练流程模式库：供 Training-Plan-Generator 参考的候选pipeline_stages命名模式
+# 不强制约束最终结果，LLM可自主选择/裁剪/扩展。
+# 字段说明：
+#   task_types  : 适用任务类型
+#   stages      : 阶段列表，每项包含 name / start_from / goal / typical_engine
+#   description : 该模式的简要说明
+
+LLM-SFT:
+  task_types: [llm-sft]
+  description: 单阶段监督微调，最常见的LLM微调模式。
+  stages:
+    - name: SFT
+      start_from: base_model
+      goal: 指令遵循能力对齐
+      typical_engine: llamafactory|trl|transformers
+
+LLM-SFT-DPO:
+  task_types: [llm-sft, llm-dpo, llm-rlhf]
+  description: 先SFT打基础，再用DPO做偏好对齐。
+  stages:
+    - name: SFT
+      start_from: base_model
+      goal: 指令遵循能力对齐
+      typical_engine: llamafactory|trl
+    - name: DPO
+      start_from: stage_1_sft_checkpoint
+      goal: 人类偏好对齐
+      typical_engine: trl|llamafactory
+
+LLM-SFT-DPO-GRPO:
+  task_types: [llm-sft, llm-dpo, llm-grpo, llm-rlhf]
+  description: SFT+DPO+GRPO三阶段，适合需强推理/复杂对齐的场景。
+  stages:
+    - name: SFT
+      start_from: base_model
+      goal: 指令遵循能力对齐
+      typical_engine: llamafactory|trl
+    - name: DPO
+      start_from: stage_1_sft_checkpoint
+      goal: 人类偏好对齐
+      typical_engine: trl
+    - name: GRPO
+      start_from: stage_2_dpo_checkpoint
+      goal: 强化学习进一步优化推理/正确性奖励
+      typical_engine: trl|verl
+
+LLM-SFT-PPO:
+  task_types: [llm-sft, llm-ppo, llm-rlhf]
+  description: SFT后接PPO强化学习对齐（经典RLHF流程）。
+  stages:
+    - name: SFT
+      start_from: base_model
+      goal: 指令遵循能力对齐
+      typical_engine: llamafactory|trl
+    - name: Reward-Model
+      start_from: stage_1_sft_checkpoint
+      goal: 训练奖励模型
+      typical_engine: trl
+    - name: PPO
+      start_from: stage_1_sft_checkpoint
+      goal: 基于奖励模型强化学习优化
+      typical_engine: trl|verl
+
+LLM-Pretrain-SFT:
+  task_types: [llm-pretrain, llm-sft]
+  description: 继续预训练后再SFT，适合领域适配场景。
+  stages:
+    - name: Continue-Pretrain
+      start_from: base_model
+      goal: 领域语料继续预训练
+      typical_engine: transformers|llamafactory
+    - name: SFT
+      start_from: stage_1_pretrain_checkpoint
+      goal: 指令遵循能力对齐
+      typical_engine: llamafactory|trl
+
+CV-Finetune-EMA:
+  task_types: [cv-detect, cv-segment, cv-classify]
+  description: CV任务经典微调+EMA权重平滑流程。
+  stages:
+    - name: Warmup
+      start_from: pretrained_weights
+      goal: 学习率warmup稳定训练初期
+      typical_engine: ultralytics
+    - name: Main-Finetune
+      start_from: stage_1_warmup_checkpoint
+      goal: 主体微调训练
+      typical_engine: ultralytics
+    - name: EMA-Eval
+      start_from: stage_2_finetune_checkpoint
+      goal: EMA权重平滑+验证集评估
+      typical_engine: ultralytics
+
+CV-Pretrain-Finetune:
+  task_types: [cv-detect, cv-segment, cv-classify]
+  description: 无预训练权重时，先在大规模数据预训练，再微调到目标任务。
+  stages:
+    - name: Pretrain
+      start_from: random_init
+      goal: 大规模数据预训练获得通用特征
+      typical_engine: ultralytics|transformers
+    - name: Finetune
+      start_from: stage_1_pretrain_checkpoint
+      goal: 目标任务微调
+      typical_engine: ultralytics

@@ -1,0 +1,88 @@
+# 数据格式规范库：供 Dataset-Analysis / Training-Plan-Generator / data_format_converters 参考
+# 字段说明：
+#   category    : llm | cv-detect | cv-segment
+#   fields      : 该格式的核心字段结构说明
+#   example     : 单条样例（简化）
+#   typical_use : 常见适用场景/引擎
+
+ShareGPT:
+  category: llm
+  fields:
+    conversations: "list[{from: human|gpt|system, value: str}]"
+  example:
+    conversations:
+      - {from: system, value: "你是一个helpful assistant"}
+      - {from: human, value: "介绍一下巴黎"}
+      - {from: gpt, value: "巴黎是法国首都..."}
+  typical_use: llamafactory多轮对话SFT
+
+Alpaca:
+  category: llm
+  fields:
+    instruction: str
+    input: "str（可选，附加上下文）"
+    output: str
+  example:
+    instruction: "翻译成英文"
+    input: "你好世界"
+    output: "Hello world"
+  typical_use: llamafactory/trl 单轮指令微调SFT
+
+OpenAI-Messages:
+  category: llm
+  fields:
+    messages: "list[{role: system|user|assistant, content: str}]"
+  example:
+    messages:
+      - {role: system, content: "你是一个helpful assistant"}
+      - {role: user, content: "介绍一下巴黎"}
+      - {role: assistant, content: "巴黎是法国首都..."}
+  typical_use: transformers/trl chat template对齐场景
+
+COCO:
+  category: cv-detect
+  fields:
+    images: "list[{id, file_name, width, height}]"
+    annotations: "list[{id, image_id, category_id, bbox: [x,y,w,h], area, iscrowd}]"
+    categories: "list[{id, name, supercategory}]"
+  example:
+    images: [{id: 1, file_name: "0001.jpg", width: 640, height: 480}]
+    annotations: [{id: 1, image_id: 1, category_id: 1, bbox: [10, 20, 100, 150], area: 15000, iscrowd: 0}]
+    categories: [{id: 1, name: "person"}]
+  typical_use: 通用检测数据集标准格式
+
+YOLO-txt:
+  category: cv-detect
+  fields:
+    per_image_txt: "每行: <class_id> <x_center_norm> <y_center_norm> <width_norm> <height_norm>"
+  example:
+    "0001.txt": "0 0.512 0.375 0.156 0.312"
+  typical_use: ultralytics yolo train 直接消费格式
+
+VOC-XML:
+  category: cv-detect
+  fields:
+    annotation: "{size: {width,height}, object: list[{name, bndbox: {xmin,ymin,xmax,ymax}}]}"
+  example:
+    annotation:
+      size: {width: 640, height: 480}
+      object:
+        - {name: "person", bndbox: {xmin: 10, ymin: 20, xmax: 110, ymax: 170}}
+  typical_use: 传统检测数据集格式，部分历史数据集/工具链使用
+
+COCO-seg:
+  category: cv-segment
+  fields:
+    annotations: "list[{id, image_id, category_id, segmentation: [[x1,y1,x2,y2,...]], area, bbox, iscrowd}]"
+  example:
+    annotations:
+      - {id: 1, image_id: 1, category_id: 1, segmentation: [[10, 10, 50, 10, 50, 50, 10, 50]], area: 1600, bbox: [10, 10, 40, 40], iscrowd: 0}
+  typical_use: 实例分割任务，多边形标注
+
+Mask-PNG:
+  category: cv-segment
+  fields:
+    mask_image: "单通道PNG，像素值=class_id（0通常为背景）"
+  example:
+    "0001_mask.png": "每个像素值代表所属类别id的灰度图"
+  typical_use: 语义分割任务，像素级标注

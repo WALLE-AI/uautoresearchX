@@ -1,0 +1,43 @@
+# 训练引擎清单与 scripts/<engine>_run.sh 映射
+# 字段说明：
+#   installed  : 当前环境是否已安装
+#   run_script : 对应的启动脚本路径（相对项目根目录）
+#   logger     : 默认日志形态 local | wandb | swanlab（Trainer Agent读取并透传给run.sh）
+#   cli        : 该引擎底层实际调用的命令行工具/入口
+#   task_types : 适用任务类型（供Model-Selection/Training-Plan-Generator参考）
+
+llamafactory:
+  installed: true
+  run_script: scripts/llamafactory_run.sh
+  logger: wandb
+  cli: llamafactory-cli train
+  task_types: [llm-sft, llm-dpo, llm-ppo, vlm-sft]
+
+trl:
+  installed: true
+  run_script: scripts/trl_run.sh
+  logger: wandb
+  cli: "trl sft / trl dpo / trl grpo"
+  task_types: [llm-sft, llm-dpo, llm-grpo, llm-ppo]
+
+transformers:
+  installed: true
+  run_script: scripts/transformers_run.sh
+  logger: local
+  cli: "python -m transformers.Trainer驱动脚本"
+  task_types: [llm-pretrain, llm-sft, general-finetune]
+
+ultralytics:
+  installed: true
+  run_script: scripts/ultralytics_run.sh
+  logger: local
+  cli: yolo train
+  task_types: [cv-detect, cv-segment, cv-classify]
+
+verl:
+  installed: false
+  run_script: scripts/verl_run.sh
+  logger: wandb
+  cli: "verl（未安装，占位）"
+  task_types: [llm-rlhf, llm-ppo, llm-grpo]
+  note: "当前环境未安装verl，run.sh仅输出安装提示；用户后续可 pip install verl 后移除占位逻辑。"
