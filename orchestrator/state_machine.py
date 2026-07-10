@@ -109,16 +109,18 @@ class StateMachine:
         self.state = PipelineState.PLANNING
         self.transitions: list[str] = []
 
-        self.scenario_agent = scenario_agent or ScenarioAnalysisAgent()
-        self.dataset_agent = dataset_agent or DatasetAnalysisAgent()
-        self.model_agent = model_agent or ModelSelectionAgent()
-        self.plan_agent = plan_agent or TrainingPlanGeneratorAgent()
-        self.review_agent = review_agent or PlanReviewerAgent()
-        self.report_agent = report_agent or ReportWriterAgent()
-        self.trainer_agent = trainer_agent or TrainerAgent()
-        self.monitor_agent = monitor_agent or MonitorAgent()
-        self.evaluator_agent = evaluator_agent or EvaluatorAgent()
-        self.knowledge_agent = knowledge_agent or KnowledgeUpdateAgent()
+        agent_log_dir = self.config.logs_root / self.ctx.run_id / "agents"
+
+        self.scenario_agent = scenario_agent or ScenarioAnalysisAgent(log_dir=agent_log_dir)
+        self.dataset_agent = dataset_agent or DatasetAnalysisAgent(log_dir=agent_log_dir)
+        self.model_agent = model_agent or ModelSelectionAgent(log_dir=agent_log_dir)
+        self.plan_agent = plan_agent or TrainingPlanGeneratorAgent(log_dir=agent_log_dir)
+        self.review_agent = review_agent or PlanReviewerAgent(log_dir=agent_log_dir)
+        self.report_agent = report_agent or ReportWriterAgent(log_dir=agent_log_dir)
+        self.trainer_agent = trainer_agent or TrainerAgent(log_dir=agent_log_dir)
+        self.monitor_agent = monitor_agent or MonitorAgent(log_dir=agent_log_dir)
+        self.evaluator_agent = evaluator_agent or EvaluatorAgent(log_dir=agent_log_dir)
+        self.knowledge_agent = knowledge_agent or KnowledgeUpdateAgent(log_dir=agent_log_dir)
 
         self._scenario_output: dict[str, Any] | None = None
         self._dataset_output: dict[str, Any] | None = None
@@ -184,7 +186,7 @@ class StateMachine:
         assert result.structured_output is not None
         self._model_output = result.structured_output
 
-    def _call_training_plan(self) -> None:
+    def _call_training_plan(self, review_feedback: str | None = None) -> None:
         assert (
             self._scenario_output is not None
             and self._dataset_output is not None
@@ -198,6 +200,7 @@ class StateMachine:
             scenario_output=json.dumps(self._scenario_output, ensure_ascii=False),
             dataset_output=json.dumps(self._dataset_output, ensure_ascii=False),
             model_selection_output=json.dumps(self._model_output, ensure_ascii=False),
+            review_feedback=review_feedback or "",
         )
         assert result.structured_output is not None
         plan = TrainingPlanOutput(**result.structured_output)
@@ -253,17 +256,18 @@ class StateMachine:
                 self._transition(PipelineState.FAILED)
                 return
 
+            review_feedback = f"评审结论: {review.summary}\n问题清单: {issues}"
             rollback_target = determine_rollback_target(issues)
             self._transition(PipelineState.PLANNING)
             if rollback_target == "dataset_analysis":
                 self._call_dataset()
                 self._call_model_selection()
-                self._call_training_plan()
+                self._call_training_plan(review_feedback=review_feedback)
             elif rollback_target == "model_selection":
                 self._call_model_selection()
-                self._call_training_plan()
+                self._call_training_plan(review_feedback=review_feedback)
             else:
-                self._call_training_plan()
+                self._call_training_plan(review_feedback=review_feedback)
 
     def _run_report(self) -> None:
         assert self.training_plan is not None

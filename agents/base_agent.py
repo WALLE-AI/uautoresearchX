@@ -10,8 +10,12 @@
 
 from __future__ import annotations
 
+import json
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ValidationError
@@ -77,6 +81,7 @@ class BaseAgent(ABC):
         *,
         cwd: str | None = None,
         engine: BaseAgentEngine | None = None,
+        log_dir: Path | None = None,
     ) -> None:
         if not getattr(self, "agent_id", None):
             raise AgentConfigError(f"{type(self).__name__} 未设置 agent_id 类属性")
@@ -92,6 +97,12 @@ class BaseAgent(ABC):
             self.config, cwd=cwd
         )
         self._started = False
+        # `log_dir` 非None时，每次run()调用（含每次重试）都会在此目录下落盘一份
+        # 记录system/user prompt、返回文本、结构化输出、耗时、错误信息的JSON文件，
+        # 供事后追溯每个Agent的真实LLM交互过程（此前完全没有持久化，只存在于
+        # 内存中的AgentResult.events，进程一退出就不可追溯）。
+        self.log_dir = log_dir
+        self._call_counter = 0
 
     # ------------------------------------------------------------------
     @abstractmethod
@@ -136,8 +147,10 @@ class BaseAgent(ABC):
         last_error: Exception | None = None
         user_prompt = base_user_prompt
         for attempt in range(1, self.max_retries + 2):
+            self._call_counter += 1
+            started_at = time.monotonic()
             try:
-                return self.engine.run(
+                result = self.engine.run(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     output_schema=self.output_schema,
@@ -145,13 +158,73 @@ class BaseAgent(ABC):
                     timeout=self.config.timeout,
                 )
             except _ENGINE_OUTPUT_ERRORS as exc:
+                self._write_call_log(
+                    attempt=attempt,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    duration_seconds=time.monotonic() - started_at,
+                    result=None,
+                    error=exc,
+                )
                 last_error = exc
                 user_prompt = base_user_prompt + self.build_retry_feedback(exc, attempt)
                 continue
+            except Exception as exc:  # noqa: BLE001 - 超时等非结构化输出类错误也要落盘再抛出
+                self._write_call_log(
+                    attempt=attempt,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    duration_seconds=time.monotonic() - started_at,
+                    result=None,
+                    error=exc,
+                )
+                raise
+
+            self._write_call_log(
+                attempt=attempt,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                duration_seconds=time.monotonic() - started_at,
+                result=result,
+                error=None,
+            )
+            return result
 
         raise AgentRunError(
             f"{self.agent_id} 在重试{self.max_retries}次后仍未产出合法输出: {last_error}"
         ) from last_error
+
+    def _write_call_log(
+        self,
+        *,
+        attempt: int,
+        system_prompt: str,
+        user_prompt: str,
+        duration_seconds: float,
+        result: AgentResult | None,
+        error: Exception | None,
+    ) -> None:
+        if self.log_dir is None:
+            return
+        self.log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = self.log_dir / f"{self.agent_id}_{self._call_counter:03d}_attempt{attempt}.json"
+        record: dict[str, Any] = {
+            "agent_id": self.agent_id,
+            "attempt": attempt,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "duration_seconds": round(duration_seconds, 3),
+            "engine": self.config.engine,
+            "timeout": self.config.timeout,
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+        }
+        if error is not None:
+            record["error"] = f"{type(error).__name__}: {error}"
+        if result is not None:
+            record["result_text"] = result.text
+            record["structured_output"] = result.structured_output
+            record["event_count"] = len(result.events)
+        log_path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def stop(self) -> None:
         """释放底层engine长驻进程。"""

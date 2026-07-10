@@ -67,11 +67,12 @@ class TrainingPlanGeneratorAgent(BaseAgent):
             "精度、分阶段训练日历。\n\n"
             "训练流程策略：你需要明确回答'起点（基础模型 vs 中间checkpoint）+阶段序列'。"
             "决策依据优先级：(1)优先复用knowledge_base中相似任务的历史成功案例；"
-            "(2)若无合适案例，调用WebSearch/WebFetch检索行业实践/论文补充依据；"
-            "(3)综合任务类型、下方模式库、检索结果、历史案例，自主选择/裁剪/扩展出最终"
+            "(2)本次运行环境不可使用WebSearch/WebFetch工具，禁止调用它们，若无合适历史"
+            "案例请基于你自身知识补充依据；"
+            "(3)综合任务类型、下方模式库、历史案例、自身知识，自主选择/裁剪/扩展出最终"
             "阶段序列，不局限于模式库中已有条目。pipeline_stages每阶段需标注：起点权重"
             "来源、训练目标、所用训练引擎、关键超参、预计耗时，并在decision_references"
-            "中附上历史案例ID或检索URL/论文标题。\n\n"
+            "中附上历史案例ID（无检索来源时可留空）。\n\n"
             "数据格式定案：结合Dataset-Analysis的候选格式列表与Model-Selection的模型"
             "硬性格式要求，确定唯一最终目标格式（若冲突，以Model-Selection的硬性要求为"
             "准），产出完整字段映射规则(原始字段→目标格式字段)。\n\n"
@@ -90,6 +91,7 @@ class TrainingPlanGeneratorAgent(BaseAgent):
         model_selection_output: str = kwargs.get("model_selection_output", "")
         indicators: str = kwargs.get("indicators", "无特殊要求")
         resource_constraints: str = kwargs.get("resource_constraints", "无特殊约束")
+        review_feedback: str = kwargs.get("review_feedback", "")
 
         context = format_kv_block(
             "任务输入",
@@ -102,4 +104,11 @@ class TrainingPlanGeneratorAgent(BaseAgent):
                 "Model-Selection输出": model_selection_output,
             },
         )
+        if review_feedback:
+            context += (
+                "\n\n【重要：这是对上一版training_plan.md的修订，不是首次生成】"
+                "Plan-Reviewer拒绝了上一版计划，以下是拒绝原因，本次必须针对性修正，"
+                "不能原样或近似原样重复上一版被拒绝的方案：\n"
+                f"{review_feedback}"
+            )
         return f"{context}\n\n请产出完整训练计划。\n\n{schema_instruction(self.output_schema)}"

@@ -21,8 +21,8 @@ class ModelSelectionAgent(BaseAgent):
             "系统提示词字段，某CV框架需ultralytics YOLO txt格式），供后续"
             "Training-Plan-Generator结合Dataset-Analysis的候选格式定案；若你的硬性要求"
             "与Dataset-Analysis的候选格式冲突，以你给出的硬性要求为准。\n"
-            "建议调用WebSearch/WebFetch检索相关论文/benchmark对比支撑选型理由，并在"
-            "citations字段标注引用来源。"
+            "本次运行环境不可使用WebSearch/WebFetch工具，禁止调用它们，请基于你自身知识"
+            "给出选型理由；citations字段留空即可，不要虚构引用来源。"
         )
 
     def build_user_prompt(self, **kwargs: Any) -> str:

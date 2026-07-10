@@ -15,10 +15,10 @@ scenario_analysis:
   permission_mode: bypassPermissions
 
 dataset_analysis:
-  engine: codex
+  engine: claude
   model: default
-  timeout: 120
-  sandbox: workspace-write
+  timeout: 300
+  permission_mode: bypassPermissions
 
 model_selection:
   engine: claude
@@ -27,28 +27,29 @@ model_selection:
   permission_mode: bypassPermissions
 
 training_plan:
-  engine: opencode
+  engine: claude
   model: default
-  timeout: 180
+  timeout: 300
+  permission_mode: bypassPermissions
 
 plan_reviewer:
   engine: claude
   model: default
-  timeout: 120
+  timeout: 200
   permission_mode: bypassPermissions
 
 report_writer:
   engine: claude
   model: default
-  timeout: 120
+  timeout: 200
   permission_mode: bypassPermissions
 
 # ---- Execution Agents（三个）----
 trainer:
-  engine: codex
+  engine: claude
   model: default
-  timeout: 60
-  sandbox: workspace-write
+  timeout: 150
+  permission_mode: bypassPermissions
 
 monitor:
   engine: claude

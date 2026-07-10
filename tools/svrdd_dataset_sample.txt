@@ -1,0 +1,7 @@
+SVRDD_YOLO 道路病害检测数据集（北京五区: Fengtai/Chaoyang/Xicheng/Dongcheng/Haidian），
+原始格式为 Ultralytics YOLO txt（每张图一个txt，每行 `class_id x_center y_center w h` 归一化坐标），图片均为 1024x1024 RGB。
+本次使用完整数据集，不抽样：train 6000 张 / val 1000 张，共 7000 张，标注对象总数 18232 个。
+共 7 个类别（名称及 readme.md 中的实例数量统计，供参考，不是本次转换出的精确统计）: Longitudinal Crack(4665), Transverse Crack(3404), Alligator Crack(1728), Pothole(918), Longitudinal Patch(4128), Transverse Patch(2622), Manhole Cover(3339)。
+原始标注行示例（来自 09002200121901261107585362Q_1295741700_482055100.txt）:
+1 0.476074 0.699707 0.678711 0.040039
+6 0.060547 0.665527 0.119141 0.028320
