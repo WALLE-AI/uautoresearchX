@@ -9,7 +9,15 @@ dependencies = [
     "pydantic>=2.13.4",
     "pyyaml>=6.0.3",
     "pillow>=11.0.0",
+    "typer>=0.26.8",
+    "rich>=15.0.0",
 ]
+
+[project.scripts]
+uautoresearchx = "orchestrator.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["agents*", "orchestrator*", "configs*"]
 
 [dependency-groups]
 dev = [

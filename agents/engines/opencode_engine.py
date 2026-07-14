@@ -23,6 +23,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from agents.engines.base_engine import AgentEvent, AgentResult, BaseAgentEngine
+from agents.engines.json_extraction import extract_json_payload
 from agents.engines.jsonrpc_transport import JsonRpcTransport
 from agents.engines.process_manager import ProcessManager
 
@@ -136,7 +137,9 @@ class OpencodeEngine(BaseAgentEngine):
         structured_output: dict[str, Any] | None = None
         if output_schema is not None:
             try:
-                structured_output = output_schema.model_validate_json(text).model_dump()
+                structured_output = output_schema.model_validate_json(
+                    extract_json_payload(text)
+                ).model_dump()
             except ValidationError as exc:
                 raise OpencodeEngineError(f"输出未通过output_schema校验: {exc}") from exc
 

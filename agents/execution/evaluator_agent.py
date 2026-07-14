@@ -8,11 +8,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from agents.base_agent import BaseAgent
+from agents.engines.base_engine import AgentEvent
 from agents.execution.schemas import EvaluatorOutput
 from agents.planning.io_utils import append_markdown_log
 from agents.planning.prompt_utils import format_kv_block, schema_instruction
@@ -86,6 +88,7 @@ class EvaluatorAgent(BaseAgent):
         process_exit_code: int | None = None,
         crash_detected: bool = False,
         runs_root: Path = Path("runs"),
+        on_event: Callable[[AgentEvent], None] | None = None,
     ) -> EvaluatorOutput:
         run_dir = runs_root / run_id
 
@@ -103,7 +106,7 @@ class EvaluatorAgent(BaseAgent):
             recent_reports = _read_recent_monitor_reports(run_dir)
             trend_data = trend if trend is not None else []
             llm_result = self.run(
-                trend=trend_data, recent_reports=recent_reports, indicators=indicators
+                trend=trend_data, recent_reports=recent_reports, indicators=indicators, on_event=on_event
             )
             assert llm_result.structured_output is not None
             result = EvaluatorOutput(**llm_result.structured_output)

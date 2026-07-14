@@ -9,64 +9,64 @@
 
 # ---- Planning Agents（六个）----
 scenario_analysis:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 120
   permission_mode: bypassPermissions
 
 dataset_analysis:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 300
   permission_mode: bypassPermissions
 
 model_selection:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 120
   permission_mode: bypassPermissions
 
 training_plan:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 300
   permission_mode: bypassPermissions
 
 plan_reviewer:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 200
   permission_mode: bypassPermissions
 
 report_writer:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 200
   permission_mode: bypassPermissions
 
 # ---- Execution Agents（三个）----
 trainer:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 150
   permission_mode: bypassPermissions
 
 monitor:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 180
   interval_minutes: 5
   permission_mode: bypassPermissions
 
 evaluator:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 120
   permission_mode: bypassPermissions
 
 # ---- Knowledge Update Agent ----
 knowledge_update:
-  engine: claude
+  engine: opencode
   model: default
   timeout: 120
   permission_mode: bypassPermissions

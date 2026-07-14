@@ -22,7 +22,13 @@ class ModelSelectionAgent(BaseAgent):
             "Training-Plan-Generator结合Dataset-Analysis的候选格式定案；若你的硬性要求"
             "与Dataset-Analysis的候选格式冲突，以你给出的硬性要求为准。\n"
             "本次运行环境不可使用WebSearch/WebFetch工具，禁止调用它们，请基于你自身知识"
-            "给出选型理由；citations字段留空即可，不要虚构引用来源。"
+            "给出选型理由；citations字段留空即可，不要虚构引用来源。\n"
+            "【重要】若训练任务描述中已给出本地可用的具体模型权重文件路径，"
+            "recommended_model必须从这些路径中选择，逐字原样复制给出的完整路径"
+            "（包括文件名），禁止凭记忆/常识自行编造一个"
+            "听起来合理但任务描述里并未列出的路径或文件名——训练阶段会直接按该路径"
+            "加载权重文件，路径不存在会导致训练失败。只有任务描述完全没有提供本地"
+            "路径时，才可以推荐一个需要从网络下载的模型名称。"
         )
 
     def build_user_prompt(self, **kwargs: Any) -> str:

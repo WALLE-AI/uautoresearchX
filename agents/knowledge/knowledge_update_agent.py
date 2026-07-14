@@ -12,10 +12,12 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from agents.base_agent import BaseAgent
+from agents.engines.base_engine import AgentEvent
 from agents.knowledge.schemas import KnowledgeCardOutput
 from agents.planning.prompt_utils import format_kv_block, schema_instruction
 
@@ -105,6 +107,7 @@ class KnowledgeUpdateAgent(BaseAgent):
         improve_guide_markdown: str,
         monitor_reports_text: str,
         knowledge_base_root: Path = Path("knowledge_base"),
+        on_event: Callable[[AgentEvent], None] | None = None,
     ) -> str:
         """一次性完成LLM生成card + 落盘 + 更新index的完整流程，返回card_id。"""
         result = self.run(
@@ -112,6 +115,7 @@ class KnowledgeUpdateAgent(BaseAgent):
             analysis_report_markdown=analysis_report_markdown,
             improve_guide_markdown=improve_guide_markdown,
             monitor_reports_text=monitor_reports_text,
+            on_event=on_event,
         )
         assert result.structured_output is not None
         card = KnowledgeCardOutput(**result.structured_output)

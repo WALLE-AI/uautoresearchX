@@ -23,7 +23,11 @@ uautoresearchX/
 │   └── knowledge/                      # knowledge_update_agent + schemas
 ├── orchestrator/
 │   ├── state_machine.py                # 三阶段+核心循环状态机
-│   └── run_pipeline.py                 # CLI入口
+│   ├── run_registry.py                 # RunManifest运行状态持久化（resume/status/list/cancel的地基）
+│   ├── human_gate.py                   # 可选人工确认层（--interactive）
+│   ├── tui.py                          # 实时进度展示（rich.Live）
+│   ├── cli.py                          # 正式打包CLI（`uautoresearchx`命令），run/resume/wizard/list/status/cancel/logs
+│   └── run_pipeline.py                 # 向后兼容入口，等价于`cli.py`的run子命令
 ├── scripts/                            # <engine>_run.sh 训练启动脚本
 ├── knowledge_base/
 │   ├── index.json                      # {"entries": [{"card_id","summary","task_types"}]}
@@ -98,6 +102,45 @@ index.json`，供未来`Training-Plan-Generator`的`_load_similar_cases_summary(
 `logs/<run_id>/{local,wandb,swanlab}/train.log`（或对应SDK本地同步文件）由
 `scripts/<engine>_run.sh`产出，`agents/log_adapters/*`负责归一化解析。
 
+## CLI模式
+
+`uv pip install -e .`后可直接使用打包后的`uautoresearchx`命令（`pyproject.toml`
+的`[project.scripts]`）；`orchestrator/run_pipeline.py`仍保留，作为
+`uautoresearchx run`的薄兼容包装，`python -m orchestrator.run_pipeline
+--task-description ...`旧用法不受影响。
+
+- **`run`/`resume`/`wizard`/`list`/`status`/`cancel`/`logs`**：见
+  `orchestrator/cli.py`。`run`发起新的训练闭环；`resume`从
+  `runs/<run_id>/manifest.json`恢复被中断（CLI进程被杀/机器重启）的运行；
+  `wizard`是`run`的交互式问答版本，避免记忆一长串命令行参数；`list`/`status`
+  只读查看运行状态；`cancel`终止一次运行（若训练子进程仍存活会
+  SIGTERM/超时SIGKILL）。
+- **运行状态持久化**（`orchestrator/run_registry.py`）：`StateMachine`在每次
+  `_transition()`及Planning阶段每个中间产出后把`RunManifest`落盘到
+  `runs/<run_id>/manifest.json`，记录当前`pipeline_state`/`stage_index`/
+  `training_pid`等。`agents/execution/trainer_agent.py:launch_stage()`用
+  `start_new_session=True`让训练子进程脱离CLI进程组独立运行，并通过一层bash
+  包装把退出码写入`<stage_dir>/exit_code.txt`哨兵文件——这是resume场景下
+  重新接管一个非本进程fork出来的训练pid、获取其真实退出码的必要前提（POSIX下
+  只有父进程能`wait()`拿到子进程退出码，CLI进程重启后已不是该训练进程的
+  父进程）。
+- **resume的粒度**：不做任意时刻快照恢复，只恢复到"最后一次成功完成的状态
+  转换点"。被打断的单次Planning Agent调用会完整重新调用一次；若被杀时训练
+  子进程仍存活，`StateMachine._resume_training_loop()`会重新接管该pid继续
+  监控，不会重启训练。
+- **`on_event`/`on_transition`回调**（`orchestrator/tui.py`）：`StateMachine`
+  可选接受这两个回调，转发给全部9处`*_agent.run()`/`poll_once`/
+  `build_stage_config`/`run_and_save`调用与每次`_transition()`。`claude_engine.
+  py`/`opencode_engine.py`原本就已完整实现`AgentEvent`流式回调，`orchestrator/
+  tui.py`的`PipelineTUI`只是给这条早已存在的事件流接一个`rich.Live`消费者。
+  `run`/`resume`默认启用（`--tui/--no-tui`），非tty环境（管道/CI/nohup）自动
+  降级为纯文本输出。
+- **`--interactive`人工确认**（`orchestrator/human_gate.py`）：默认`
+  AutoHumanGate`原样采纳LLM在Plan Review/训练FAIL回退方向/达到最大重试次数
+  三类判定点的结论，与不开启`--interactive`时行为完全一致；显式传入
+  `--interactive`才会用`InteractiveHumanGate`在终端暂停等待确认，可强制覆盖
+  LLM判定或延长重试次数上限。
+
 ## 关键设计决策
 
 1. **Trainer/Monitor/Evaluator不重新解析`training_plan.md`的markdown表格**，
@@ -127,3 +170,10 @@ T8端到端验证全部使用测试替身（`ScriptedEngine`模拟LLM调用、
 生产GPU资源。`wandb_log_adapter.py`/`swanlab_log_adapter.py`对本地同步文件
 格式的假设同样未经真实环境实测（见两个模块docstring中的"未验证声明"），
 生产使用前需要针对实际安装版本重新核实。
+
+CLI模式（`run_registry.py`/`cli.py`/`human_gate.py`/`tui.py`，见
+`多智能体训练框架-CLI模式设计与实施计划-v1.md`）同样全部用`ScriptedEngine`+
+fake训练脚本验证，未做真实CLI/GPU环境下的resume/cancel/TUI人工验收；
+`start_new_session=True`+pid判活/终止是POSIX语义，当前不考虑Windows部署。
+resume只保证恢复到"最后一次成功完成的状态转换点"，不做任意时刻快照，被打断的
+单次Planning Agent调用会完整重跑一次。

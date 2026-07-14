@@ -22,6 +22,10 @@ class ScriptedEngine(BaseAgentEngine):
         self.start_calls = 0
         self.stop_calls = 0
         self.run_calls: list[tuple[str, str]] = []
+        # 记录每次run()收到的on_event回调（可能为None），供测试断言调用方是否
+        # 正确透传了回调；非None时额外回放一段最简事件序列（text_delta+done），
+        # 模拟真实engine（claude_engine.py/opencode_engine.py）的流式行为。
+        self.on_event_calls: list[Callable[[AgentEvent], None] | None] = []
 
     def start(self) -> None:
         self.start_calls += 1
@@ -35,9 +39,13 @@ class ScriptedEngine(BaseAgentEngine):
         timeout: float = 120.0,
     ) -> AgentResult:
         self.run_calls.append((system_prompt, user_prompt))
+        self.on_event_calls.append(on_event)
         item = self.script.pop(0)
         if isinstance(item, Exception):
             raise item
+        if on_event is not None:
+            on_event(AgentEvent(type="text_delta", payload={"text": item.text}))
+            on_event(AgentEvent(type="done", payload={}))
         return item
 
     def cancel(self) -> None:

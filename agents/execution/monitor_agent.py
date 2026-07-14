@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import csv
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from agents.base_agent import BaseAgent
+from agents.engines.base_engine import AgentEvent
 from agents.execution.schemas import MonitorReportOutput
 from agents.log_adapters.base_log_adapter import BaseLogAdapter, NormalizedMetrics
 from agents.log_adapters.local_log_adapter import LocalLogAdapter
@@ -166,6 +168,7 @@ class MonitorAgent(BaseAgent):
         logger_type: str,
         indicators: str = "无特殊要求",
         runs_root: Path = Path("runs"),
+        on_event: Callable[[AgentEvent], None] | None = None,
     ) -> MonitorReportOutput:
         adapter_cls = _ADAPTER_BY_LOGGER.get(logger_type)
         if adapter_cls is None:
@@ -179,7 +182,9 @@ class MonitorAgent(BaseAgent):
         _append_metrics_row(run_dir, seq, metrics, gpu_status)
         trend = _read_recent_trend(run_dir)
 
-        result = self.run(metrics=metrics, gpu_status=gpu_status, trend=trend, indicators=indicators)
+        result = self.run(
+            metrics=metrics, gpu_status=gpu_status, trend=trend, indicators=indicators, on_event=on_event
+        )
         assert result.structured_output is not None
         report = MonitorReportOutput(**result.structured_output)
 

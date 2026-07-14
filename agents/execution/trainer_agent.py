@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from collections.abc import Callable, Sequence
@@ -33,6 +34,7 @@ from agents.data_format_converters.coco_converter import COCOConverter
 from agents.data_format_converters.mask_converter import MaskConverter
 from agents.data_format_converters.sharegpt_converter import ShareGPTConverter
 from agents.data_format_converters.yolo_converter import YOLOConverter
+from agents.engines.base_engine import AgentEvent
 from agents.execution.schemas import StageConfigOutput
 from agents.planning.prompt_utils import format_kv_block, schema_instruction
 from agents.planning.schemas import DataFormatSpec, PipelineStage
@@ -162,6 +164,7 @@ class TrainerAgent(BaseAgent):
         stage_index: int,
         dataset_path: str = "",
         runs_root: Path = Path("runs"),
+        on_event: Callable[[AgentEvent], None] | None = None,
     ) -> Path:
         """调用LLM生成本阶段config.yaml并落盘，返回config.yaml路径。"""
         validate_engine_registered(stage.engine)
@@ -171,6 +174,7 @@ class TrainerAgent(BaseAgent):
             resource_plan=resource_plan,
             start_from_path=start_from_path,
             dataset_path=dataset_path,
+            on_event=on_event,
         )
         assert result.structured_output is not None
 
@@ -190,13 +194,23 @@ class TrainerAgent(BaseAgent):
         runs_root: Path = Path("runs"),
         logs_root: Path = Path("logs"),
         run_script_resolver: Callable[[str], Sequence[str]] | None = None,
-    ) -> subprocess.Popen:
+    ) -> tuple[subprocess.Popen, Path]:
         """后台启动`scripts/<engine>_run.sh`（或测试注入的替身脚本），不阻塞等待。
 
         训练脚本自身负责把stdout/日志写入`log_dir`（见`scripts/*_run.sh`的
         `tee`逻辑），因此这里不对子进程stdout/stderr设置PIPE——避免重蹈
         Engine桥接层里"stderr未被drain导致管道死锁"的覆辙，直接重定向到
         DEVNULL即可，训练进度统一通过log_adapters读取落盘的日志文件。
+
+        `start_new_session=True`让训练子进程脱离CLI主进程的进程组/会话——这是
+        支持"CLI进程被杀后resume仍能感知/重新接管训练"的前提，代价是单纯
+        Ctrl-C关闭CLI不会再顺带终止训练，需要显式调用`cancel`子命令。
+
+        子进程本身是否退出，`Popen`对象可以直接`poll()`；但resume场景下
+        新起的Python进程并非该子进程的父进程，POSIX下无法`wait()`得到它的真实
+        退出码（只能探测存活与否）。因此用一层bash包装，子进程退出后无论CLI
+        是否还在运行都会把退出码写入`<stage_dir>/exit_code.txt`，
+        `read_exit_code()`供resume路径读取。
         """
         resolver = run_script_resolver or (lambda engine: ["bash", f"scripts/{engine}_run.sh"])
 
@@ -205,9 +219,40 @@ class TrainerAgent(BaseAgent):
         run_dir.mkdir(parents=True, exist_ok=True)
         log_dir.mkdir(parents=True, exist_ok=True)
 
+        exit_code_path = run_dir / "exit_code.txt"
+        exit_code_path.unlink(missing_ok=True)
+
         command = [*resolver(stage.engine), str(run_dir), str(config_path), str(log_dir), logger_type]
-        return subprocess.Popen(
-            command,
+        wrapped_command = [
+            "bash",
+            "-c",
+            # 显式`exit "$code"`让bash包装进程本身的退出码与被包装命令一致——
+            # 否则`Popen.poll()`拿到的会是脚本最后一条`printf`语句的退出码
+            # （几乎总是0），导致正常路径下的"硬信号"崩溃检测失效。
+            'code=0; "$@" || code=$?; printf "%s" "$code" > "$EXIT_CODE_PATH"; exit "$code"',
+            "--",
+            *command,
+        ]
+        proc = subprocess.Popen(
+            wrapped_command,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            env={**os.environ, "EXIT_CODE_PATH": str(exit_code_path)},
         )
+        return proc, exit_code_path
+
+
+def read_exit_code(exit_code_path: Path) -> int | None:
+    """读取`launch_stage()`写入的退出码哨兵文件，未产出/不可解析时返回None。
+
+    用于resume场景下重新接管一个非本进程fork出来的训练子进程——该场景下
+    只能探测pid是否存活，无法通过`os.wait()`拿到真实退出码，需要依赖训练脚本
+    自身在退出时把退出码写盘。
+    """
+    if not exit_code_path.exists():
+        return None
+    try:
+        return int(exit_code_path.read_text(encoding="utf-8").strip())
+    except (ValueError, OSError):
+        return None

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,12 @@ from agents.engines.base_engine import AgentResult
 from agents.execution.evaluator_agent import EvaluatorAgent
 from agents.execution.monitor_agent import MonitorAgent
 from agents.execution.schemas import EvaluatorOutput, MonitorReportOutput, StageConfigOutput
-from agents.execution.trainer_agent import TrainerAgent, TrainerAgentError, validate_engine_registered
+from agents.execution.trainer_agent import (
+    TrainerAgent,
+    TrainerAgentError,
+    read_exit_code,
+    validate_engine_registered,
+)
 from agents.planning.schemas import DataFormatSpec, PipelineStage
 from tests.fakes.scripted_engine import ScriptedEngine
 
@@ -110,7 +116,7 @@ def test_launch_stage_runs_fake_script_and_produces_log(tmp_path: Path) -> None:
     config_path = tmp_path / "config.yaml"
     config_path.write_text("learning_rate: 2e-5\n", encoding="utf-8")
 
-    proc = agent.launch_stage(
+    proc, exit_code_path = agent.launch_stage(
         stage=_SFT_STAGE,
         config_path=config_path,
         run_id="run1",
@@ -126,6 +132,13 @@ def test_launch_stage_runs_fake_script_and_produces_log(tmp_path: Path) -> None:
     log_file = tmp_path / "logs" / "run1" / "local" / "train.log"
     assert log_file.exists()
     assert "loss" in log_file.read_text(encoding="utf-8")
+
+    # exit_code.txt由bash包装脚本写入，可能比proc.wait()的返回略晚一点点落盘。
+    for _ in range(50):
+        if exit_code_path.exists():
+            break
+        time.sleep(0.1)
+    assert read_exit_code(exit_code_path) == 0
     agent.stop()
 
 
