@@ -1,0 +1,31 @@
+{
+  "agent_id": "model_selection",
+  "attempt": 1,
+  "timestamp": "2026-07-14T09:18:09.370972+00:00",
+  "duration_seconds": 15.725,
+  "engine": "opencode",
+  "timeout": 120,
+  "system_prompt": "你是一名模型选型专家。基于Scenario-Analysis与Dataset-Analysis的输出，给出推荐模型、备选模型、选型理由、GPU需求估算、预计指标、训练时长估算。\n你必须明确给出该模型对输入数据格式的硬性要求（如某LLM需chat template/系统提示词字段，某CV框架需ultralytics YOLO txt格式），供后续Training-Plan-Generator结合Dataset-Analysis的候选格式定案；若你的硬性要求与Dataset-Analysis的候选格式冲突，以你给出的硬性要求为准。\n本次运行环境不可使用WebSearch/WebFetch工具，禁止调用它们，请基于你自身知识给出选型理由；citations字段留空即可，不要虚构引用来源。",
+  "user_prompt": "任务输入:\n- 训练任务描述: SVRDD 道路路面病害检测数据集目标检测训练，7 类别分类，使用 YOLO26n 轻量模型，小分辨率 320x320 快速验证\n- 场景分析摘要(来自Scenario-Analysis): {\"task_type\": \"cv-detect\", \"industry\": \"智慧交通/城市基础设施检测\", \"difficulty\": \"medium\", \"latency_constraint\": \"轻量级模型 实时推理\", \"priority_suggestion\": \"中优先级 - 技术验证阶段\", \"risks\": [\"道路病害样本标注成本高\", \"小目标检测精度要求\", \"不同光照/天气条件泛化\", \"模型轻量化与准确度平衡\"], \"citations\": []}\n- 数据集分析摘要(来自Dataset-Analysis): {\"num_samples\": null, \"spec\": \"道路病害检测图像，典型分辨率 640x640 或 320x320，7 类别病害类型：裂缝、坑槽、松散、龟裂、坑凼、沉陷、修补\", \"num_classes\": 7, \"class_distribution\": null, \"quality_score\": 6.5, \"augmentation_suggestions\": [\"Mosaic 数据增强适用于检测任务\", \"MixUp 提升小目标鲁棒性\", \"随机色彩抖动应对光照变化\", \"MPO 多尺度训练增强泛化\", \"Copy-Paste 合成稀疏病害样本\"], \"candidate_formats\": [\"YOLO-txt\"], \"field_mapping_hints\": [\"image_path → img_path, img_id\", \"bbox_2d → class_id, x_center, y_center, width, height (normalized 0-1)\", \"病害类别 ID → 0-6 数字映射\"], \"confidence\": \"medium\", \"citations\": []}\n- 资源/时间约束: 无特殊约束\n\n请给出模型选型建议。\n\n请严格按照以下JSON Schema输出，只输出合法JSON本身，不要用```代码块包裹，不要输出任何多余的解释性文字：\n{\n  \"description\": \"Model-Selection Agent产出：推荐模型/选型理由/资源估算/数据格式硬性要求。\",\n  \"properties\": {\n    \"recommended_model\": {\n      \"description\": \"推荐模型名称\",\n      \"title\": \"Recommended Model\",\n      \"type\": \"string\"\n    },\n    \"alternative_models\": {\n      \"description\": \"备选模型列表\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"title\": \"Alternative Models\",\n      \"type\": \"array\"\n    },\n    \"rationale\": {\n      \"description\": \"选型理由\",\n      \"title\": \"Rationale\",\n      \"type\": \"string\"\n    },\n    \"gpu_requirement\": {\n      \"description\": \"GPU需求估算，如'8x A100-40GB'\",\n      \"title\": \"Gpu Requirement\",\n      \"type\": \"string\"\n    },\n    \"estimated_metric\": {\n      \"description\": \"预计达到的指标，如'mAP≈0.87'\",\n      \"title\": \"Estimated Metric\",\n      \"type\": \"string\"\n    },\n    \"estimated_training_duration\": {\n      \"description\": \"预计训练时长估算\",\n      \"title\": \"Estimated Training Duration\",\n      \"type\": \"string\"\n    },\n    \"data_format_requirements\": {\n      \"description\": \"模型对输入数据格式的硬性要求，如'需chat template系统提示词字段'\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"title\": \"Data Format Requirements\",\n      \"type\": \"array\"\n    },\n    \"citations\": {\n      \"description\": \"检索到的相关论文/benchmark引用来源\",\n      \"items\": {\n        \"type\": \"string\"\n      },\n      \"title\": \"Citations\",\n      \"type\": \"array\"\n    }\n  },\n  \"required\": [\n    \"recommended_model\",\n    \"rationale\",\n    \"gpu_requirement\",\n    \"estimated_metric\",\n    \"estimated_training_duration\"\n  ],\n  \"title\": \"ModelSelectionOutput\",\n  \"type\": \"object\"\n}",
+  "result_text": "\n\n## Goal\n- Perform model selection for SVRDD road disease detection task using lightweight YOLO model.\n\n## Constraints & Preferences\n- Strict JSON schema output (root-level fields, no `properties` wrapper), no WebSearch/WebFetch tools.\n- Explicit hard data format requirements mandatory for Training-Plan-Generator compatibility\n\n```json\n{\n  \"recommended_model\": \"YOLOv26n-320\",\n  \"alternative_models\": [\"YOLOv8n\", \"YOLOv5n\", \"NanoDet\"],\n  \"rationale\": \"SVRDD 道路病害检测为轻量级实时目标检测任务，YOLOv26n 为 最新 YOLO 系列中最轻量版本，320x320 输入分辨率平衡速度与精度，7 类别病害检测符合小目标检测需求，原生支持 Mosaic 增强与多尺度训练，与 Dataset-Analysis 的 YOLO-txt 格式完全兼容。\",\n  \"gpu_requirement\": \"单卡 RTX 3060-12GB 或 A10G\",\n  \"estimated_metric\": \"mAP@0.5:50≈0.82-0.88\",\n  \"estimated_training_duration\": \"小数据集（<5000 张）约 4-8 小时\",\n  \"data_format_requirements\": [\n    \"严格使用 Ultralytics YOLO txt 格式：每行<class_id> <x_center> <y_center> <width> <height> (归一化 0-1)\",\n    \"图像分辨率可动态 resize 至 320x320\",\n    \"类别 ID 必须为 0-6 的连续整数索引\",\n    \"labels 文件与图像文件同目录，同名.txt\"\n  ],\n  \"citations\": []\n}\n```",
+  "structured_output": {
+    "recommended_model": "YOLOv26n-320",
+    "alternative_models": [
+      "YOLOv8n",
+      "YOLOv5n",
+      "NanoDet"
+    ],
+    "rationale": "SVRDD 道路病害检测为轻量级实时目标检测任务，YOLOv26n 为 最新 YOLO 系列中最轻量版本，320x320 输入分辨率平衡速度与精度，7 类别病害检测符合小目标检测需求，原生支持 Mosaic 增强与多尺度训练，与 Dataset-Analysis 的 YOLO-txt 格式完全兼容。",
+    "gpu_requirement": "单卡 RTX 3060-12GB 或 A10G",
+    "estimated_metric": "mAP@0.5:50≈0.82-0.88",
+    "estimated_training_duration": "小数据集（<5000 张）约 4-8 小时",
+    "data_format_requirements": [
+      "严格使用 Ultralytics YOLO txt 格式：每行<class_id> <x_center> <y_center> <width> <height> (归一化 0-1)",
+      "图像分辨率可动态 resize 至 320x320",
+      "类别 ID 必须为 0-6 的连续整数索引",
+      "labels 文件与图像文件同目录，同名.txt"
+    ],
+    "citations": []
+  },
+  "event_count": 2410
+}

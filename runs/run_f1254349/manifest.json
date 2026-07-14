@@ -1,0 +1,94 @@
+{
+  "run_id": "run_f1254349",
+  "status": "RUNNING",
+  "pipeline_state": "PLANNING",
+  "created_at": "2026-07-14T09:16:13.099811+00:00",
+  "updated_at": "2026-07-14T09:18:09.371733+00:00",
+  "owner_pid": 3702600,
+  "task_description_preview": "SVRDD 道路路面病害检测数据集目标检测训练，7 类别分类，使用 YOLO26n 轻量模型，小分辨率 320x320 快速验证",
+  "context": {
+    "run_id": "run_f1254349",
+    "task_description": "SVRDD 道路路面病害检测数据集目标检测训练，7 类别分类，使用 YOLO26n 轻量模型，小分辨率 320x320 快速验证",
+    "dataset_path": "/home/dataset1/数据/SVRDD",
+    "dataset_sample": "",
+    "dataset_records": [],
+    "indicators": "无特殊要求",
+    "resource_constraints": "无特殊约束",
+    "available_resources": "8x NVIDIA A100-SXM4-40GB"
+  },
+  "config": {
+    "max_plan_review_retries": 3,
+    "max_stage_retries": 3,
+    "max_replanning_attempts": 2,
+    "poll_interval_seconds": 300.0,
+    "max_polls_per_stage": 100000,
+    "logger_type": "local",
+    "runs_root": "runs",
+    "logs_root": "logs",
+    "knowledge_base_root": "knowledge_base"
+  },
+  "scenario_output": {
+    "task_type": "cv-detect",
+    "industry": "智慧交通/城市基础设施检测",
+    "difficulty": "medium",
+    "latency_constraint": "轻量级模型 实时推理",
+    "priority_suggestion": "中优先级 - 技术验证阶段",
+    "risks": [
+      "道路病害样本标注成本高",
+      "小目标检测精度要求",
+      "不同光照/天气条件泛化",
+      "模型轻量化与准确度平衡"
+    ],
+    "citations": []
+  },
+  "dataset_output": {
+    "num_samples": null,
+    "spec": "道路病害检测图像，典型分辨率 640x640 或 320x320，7 类别病害类型：裂缝、坑槽、松散、龟裂、坑凼、沉陷、修补",
+    "num_classes": 7,
+    "class_distribution": null,
+    "quality_score": 6.5,
+    "augmentation_suggestions": [
+      "Mosaic 数据增强适用于检测任务",
+      "MixUp 提升小目标鲁棒性",
+      "随机色彩抖动应对光照变化",
+      "MPO 多尺度训练增强泛化",
+      "Copy-Paste 合成稀疏病害样本"
+    ],
+    "candidate_formats": [
+      "YOLO-txt"
+    ],
+    "field_mapping_hints": [
+      "image_path → img_path, img_id",
+      "bbox_2d → class_id, x_center, y_center, width, height (normalized 0-1)",
+      "病害类别 ID → 0-6 数字映射"
+    ],
+    "confidence": "medium",
+    "citations": []
+  },
+  "model_output": {
+    "recommended_model": "YOLOv26n-320",
+    "alternative_models": [
+      "YOLOv8n",
+      "YOLOv5n",
+      "NanoDet"
+    ],
+    "rationale": "SVRDD 道路病害检测为轻量级实时目标检测任务，YOLOv26n 为 最新 YOLO 系列中最轻量版本，320x320 输入分辨率平衡速度与精度，7 类别病害检测符合小目标检测需求，原生支持 Mosaic 增强与多尺度训练，与 Dataset-Analysis 的 YOLO-txt 格式完全兼容。",
+    "gpu_requirement": "单卡 RTX 3060-12GB 或 A10G",
+    "estimated_metric": "mAP@0.5:50≈0.82-0.88",
+    "estimated_training_duration": "小数据集（<5000 张）约 4-8 小时",
+    "data_format_requirements": [
+      "严格使用 Ultralytics YOLO txt 格式：每行<class_id> <x_center> <y_center> <width> <height> (归一化 0-1)",
+      "图像分辨率可动态 resize 至 320x320",
+      "类别 ID 必须为 0-6 的连续整数索引",
+      "labels 文件与图像文件同目录，同名.txt"
+    ],
+    "citations": []
+  },
+  "stage_index": null,
+  "stage_iteration": null,
+  "replanning_attempts": 0,
+  "training_pid": null,
+  "training_exit_code_path": null,
+  "knowledge_card_id": null,
+  "last_error": null
+}

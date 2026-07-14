@@ -1,0 +1,42 @@
+{
+  "agent_id": "plan_reviewer",
+  "attempt": 1,
+  "timestamp": "2026-07-14T09:17:50.702290+00:00",
+  "duration_seconds": 5.163,
+  "engine": "opencode",
+  "timeout": 200,
+  "system_prompt": "你是一名训练计划评审专家。审查training_plan.md是否满足以下要求：\n1. 资源可行性：GPU/显存是否足够支撑该计划的Batch Size/模型规模；\n2. 超参合理性：学习率/优化器/精度等设置是否合理；\n3. pipeline_stages设计是否匹配任务类型（阶段顺序/起点权重来源是否合理）；\n4. 数据格式是否满足模型硬性要求且字段映射完整；\n5. 是否有依据支撑（历史案例引用或检索来源），而非凭空给出；\n6. 能否达成用户目标指标的可行性。\n\n若存在任何问题，approved=false，并在issues中逐条列出，每条标注category：'计划参数'(资源/超参/流程编排不当)、'选型判断'(模型选型错误导致的问题)、'数据理解'(数据集理解错误导致的问题)。若多个问题源于同一根本原因，只需按最根本的类别归类一次，避免重复。若全部通过，approved=true，issues为空列表。",
+  "user_prompt": "评审输入:\n- 当前可用资源: 8x NVIDIA A100-SXM4-40GB\n- 用户指标要求: 无特殊要求\n\n待评审的training_plan.md全文：\n---\n# SVRDD 道路路面病害检测 - 训练计划\n\n## TL;DR（人类速览）\n- **任务类型**：CV 目标检测（7 类别道路病害）\n- **推荐模型**：YOLOv8n（轻量实时）\n- **起点权重**：YOLOv8n 官方预训练权重（COCO 预训练）\n- **流程模式**：CV-Finetune （单阶段微调）\n- **输入分辨率**：320×320（快速验证）\n- **预计耗时**：2-4 小时（A100, 1k-10k 样本）\n- **预期指标**：mAP@50≈0.82-0.87, mAP@50-95≈0.55-0.62\n\n## 资源规划\n| 资源项 | 规划 |\n|--------|------|\n| GPU | 1× A100-40GB 或 1× RTX 3090/4090-24GB |\n| 显存 | ~12-16GB (batch_size=32, 320×320) |\n| CPU | 8 核以上 |\n| 存储 | 50GB+（数据集+权重+ checkpoint）|\n| 训练时长 | 2-4 小时（1k-10k 样本）|\n\n## Pipeline Stages（训练流程）\n\n### Stage 1: YOLOv8n 微调\n- **起点权重**：YOLOv8n 官方 COCO 预训练权重\n- **目标**：在 SVRDD 道路病害数据集上监督微调，适配 7 类别检测\n- **引擎**：ultralytics (YOLOv8 Training API)\n- **关键超参**：\n  - batch_size: 32\n  - epochs: 100\n  - lr0: 0.01 (初始学习率)\n  - lrf: 0.01 (最终学习率)\n  - optimizer: SGD with momentum\n  - weight_decay: 0.0005\n  - image_size: 320\n  - augmentation: Mosaic(1.0), MixUp(0.1), Copy-Paste(0.1)\n- **预计耗时**：2-4 小时（1× A100）\n\n## 数据格式\n\n### 最终目标格式：YOLO-txt\n**选择理由**：\n1. Model-Selection 硬性要求 YOLOv8 原生支持 YOLO-txt 格式\n2. Dataset-Analysis 候选格式中 YOLO-txt 是唯一推荐\n3. YOLOv8n 与 YOLO-txt 完美兼容，无需格式转换\n\n### 字段映射规则\n| 原始字段 | 目标字段 | 转换规则 |\n|----------|----------|----------|\n| image_path | img_path / img_id | 直接映射，img_id 提取文件名 |\n| bbox_2d (x1,y1,x2,y2) | class_id x_center y_center width height | 转换为归一化坐标 (0-1)：\n- x_center = (x1+x2)/2 / img_width\n- y_center = (y1+y2)/2 / img_height\n- width = (x2-x1) / img_width\n- height = (y2-y1) / img_height\n| 病害类别名称 | class_id | 映射到 0-6：裂缝=0, 坑槽=1, 松散=2, 龟裂=3, 坑凼=4, 沉陷=5, 修补=6 |\n\n## 训练日历（分阶段）\n\n| 阶段 | 内容 | 时长 | 产出 |\n|------|------|------|------|\n| Day 1 | 数据准备 + 格式转换 + 验证集划分 | 4-8 小时 | 标准化的 YOLO-txt 数据集 |\n| Day 2 | Stage 1 微调训练（100 epochs） | 2-4 小时 | final.weights, last.weights |\n| Day 3 | 模型验证 + 指标评估 + 推理测试 | 2-4 小时 | 评估报告+推理 demo |\n\n## 验证与达标标准\n- **主要指标**：mAP@50 ≥ 0.80\n- **次要指标**：mAP@50-95 ≥ 0.50, Inference FPS ≥ 30 (320×320, T4)\n- **验收标准**：验证集 mAP@50 达到预期区间 0.82-0.87，推理速度满足实时性要求\n\n## 决策依据与引用来源\n- **模式选择**：CV-Finetune（基于 Model-Selection 推荐 YOLOv8n 单阶段微调方案）\n- **模型选择**：YOLOv8n（社区生态成熟、推理速度快、支持小分辨率输入）\n- **数据格式**：YOLO-txt（Model-Selection 硬性要求 + Dataset-Analysis 候选推荐）\n- **无历史案例**：knowledge_base 中未找到 cv-detect 类型案例，基于领域知识补充\n---\n\n请给出评审结论。\n\n请严格按照以下JSON Schema输出，只输出合法JSON本身，不要用```代码块包裹，不要输出任何多余的解释性文字：\n{\n  \"$defs\": {\n    \"ReviewIssue\": {\n      \"description\": \"Plan Reviewer拒绝时列出的单条问题。\",\n      \"properties\": {\n        \"category\": {\n          \"description\": \"问题类别，决定分层回退目标\",\n          \"enum\": [\n            \"计划参数\",\n            \"选型判断\",\n            \"数据理解\"\n          ],\n          \"title\": \"Category\",\n          \"type\": \"string\"\n        },\n        \"description\": {\n          \"description\": \"具体问题描述\",\n          \"title\": \"Description\",\n          \"type\": \"string\"\n        }\n      },\n      \"required\": [\n        \"category\",\n        \"description\"\n      ],\n      \"title\": \"ReviewIssue\",\n      \"type\": \"object\"\n    }\n  },\n  \"description\": \"Plan Reviewer Agent产出：评审结论。\",\n  \"properties\": {\n    \"approved\": {\n      \"description\": \"是否通过评审\",\n      \"title\": \"Approved\",\n      \"type\": \"boolean\"\n    },\n    \"issues\": {\n      \"description\": \"未通过时的问题清单，逐条编号\",\n      \"items\": {\n        \"$ref\": \"#/$defs/ReviewIssue\"\n      },\n      \"title\": \"Issues\",\n      \"type\": \"array\"\n    },\n    \"summary\": {\n      \"description\": \"评审结论摘要\",\n      \"title\": \"Summary\",\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"approved\",\n    \"summary\"\n  ],\n  \"title\": \"PlanReviewOutput\",\n  \"type\": \"object\"\n}",
+  "result_text": "\n\n{\n  \"approved\": false,\n  \"issues\": [\n    {\n      \"category\": \"计划参数\",\n      \"description\": \"资源规划与实际硬件不匹配：文档中规划使用 1× GPU，但可用资源为 8× A100-40GB，应利用多卡提升训练效率或增大 batch_size\"\n    },\n    {\n      \"category\": \"计划参数\",\n      \"description\": \"batch_size=32 与 320×320 分辨率下 1× A100-40GB 的显存规划（12-16GB）不匹配，YOLOv8 在 A100-40GB 上可支持更大 batch_size（建议 64-128）\"\n    },\n    {\n      \"category\": \"计划参数\",\n      \"description\": \"学习率设置不合理：YOLOv8 官方推荐初始学习率 lr0=0.01 对应 SGD optimizer 时偏大，官方实践通常采用 0.01 配合 warmup，但 lrf=0.01 过低，一般设为 0.01-0.1\"\n    },\n    {\n      \"category\": \"选型判断\",\n      \"description\": \"YOLOv8n 输入分辨率设置为 320×320 偏小，YOLOv8n 原生支持 640×640，小分辨率可能导致小目标病害漏检，降低检测精度\"\n    },\n    {\n      \"category\": \"数据理解\",\n      \"description\": \"数据格式字段映射说明不完整：缺少 image_path 到 img_path/img_id 的明确映射规则，以及标注文件中 class_id 的验证机制\"\n    },\n    {\n      \"category\": \"选型判断\",\n      \"description\": \"预期指标可能过于乐观：mAP@50≈0.82-0.87 基于 COCO 预训练迁移到道路病害领域，病害与小目标、标注质量等因素可能导致实际精度低于预期，缺乏历史案例支撑\"\n    }\n  ],\n  \"summary\": \"训练计划存在多处不合理：GPU 资源利用率低、batch_size 与显存规划矛盾、超参设置与 YOLOv8 官方实践有偏差、输入分辨率偏小可能导致小目标漏检、数据格式说明不完整、预期指标缺乏依据且过于乐观。建议调整超参、优化资源使用、补充数据验证说明，并提供指标预估的依据来源。\"\n}",
+  "structured_output": {
+    "approved": false,
+    "issues": [
+      {
+        "category": "计划参数",
+        "description": "资源规划与实际硬件不匹配：文档中规划使用 1× GPU，但可用资源为 8× A100-40GB，应利用多卡提升训练效率或增大 batch_size"
+      },
+      {
+        "category": "计划参数",
+        "description": "batch_size=32 与 320×320 分辨率下 1× A100-40GB 的显存规划（12-16GB）不匹配，YOLOv8 在 A100-40GB 上可支持更大 batch_size（建议 64-128）"
+      },
+      {
+        "category": "计划参数",
+        "description": "学习率设置不合理：YOLOv8 官方推荐初始学习率 lr0=0.01 对应 SGD optimizer 时偏大，官方实践通常采用 0.01 配合 warmup，但 lrf=0.01 过低，一般设为 0.01-0.1"
+      },
+      {
+        "category": "选型判断",
+        "description": "YOLOv8n 输入分辨率设置为 320×320 偏小，YOLOv8n 原生支持 640×640，小分辨率可能导致小目标病害漏检，降低检测精度"
+      },
+      {
+        "category": "数据理解",
+        "description": "数据格式字段映射说明不完整：缺少 image_path 到 img_path/img_id 的明确映射规则，以及标注文件中 class_id 的验证机制"
+      },
+      {
+        "category": "选型判断",
+        "description": "预期指标可能过于乐观：mAP@50≈0.82-0.87 基于 COCO 预训练迁移到道路病害领域，病害与小目标、标注质量等因素可能导致实际精度低于预期，缺乏历史案例支撑"
+      }
+    ],
+    "summary": "训练计划存在多处不合理：GPU 资源利用率低、batch_size 与显存规划矛盾、超参设置与 YOLOv8 官方实践有偏差、输入分辨率偏小可能导致小目标漏检、数据格式说明不完整、预期指标缺乏依据且过于乐观。建议调整超参、优化资源使用、补充数据验证说明，并提供指标预估的依据来源。"
+  },
+  "event_count": 627
+}

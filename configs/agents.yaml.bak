@@ -1,0 +1,72 @@
+# 各Agent使用的CLI引擎、模型、超时等配置
+# 字段说明：
+#   engine          : codex | claude | opencode
+#   model           : 传给CLI的模型名，"default"表示使用CLI默认模型
+#   timeout         : 单次run()调用超时时间（秒）
+#   permission_mode : 可选，透传给claude的--permission-mode（免审批模式，如 bypassPermissions）
+#   sandbox         : 可选，透传给codex的sandbox策略（read-only|workspace-write|danger-full-access）
+#   interval_minutes: 可选，仅monitor使用，LLM深度分析轮询间隔（分钟）
+
+# ---- Planning Agents（六个）----
+scenario_analysis:
+  engine: claude
+  model: default
+  timeout: 120
+  permission_mode: bypassPermissions
+
+dataset_analysis:
+  engine: claude
+  model: default
+  timeout: 300
+  permission_mode: bypassPermissions
+
+model_selection:
+  engine: claude
+  model: default
+  timeout: 120
+  permission_mode: bypassPermissions
+
+training_plan:
+  engine: claude
+  model: default
+  timeout: 300
+  permission_mode: bypassPermissions
+
+plan_reviewer:
+  engine: claude
+  model: default
+  timeout: 200
+  permission_mode: bypassPermissions
+
+report_writer:
+  engine: claude
+  model: default
+  timeout: 200
+  permission_mode: bypassPermissions
+
+# ---- Execution Agents（三个）----
+trainer:
+  engine: claude
+  model: default
+  timeout: 150
+  permission_mode: bypassPermissions
+
+monitor:
+  engine: claude
+  model: default
+  timeout: 180
+  interval_minutes: 5
+  permission_mode: bypassPermissions
+
+evaluator:
+  engine: claude
+  model: default
+  timeout: 120
+  permission_mode: bypassPermissions
+
+# ---- Knowledge Update Agent ----
+knowledge_update:
+  engine: claude
+  model: default
+  timeout: 120
+  permission_mode: bypassPermissions

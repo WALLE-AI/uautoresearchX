@@ -1,0 +1,8 @@
+SVRDD_YOLO 道路路面病害检测数据集（北京五区: Fengtai/Chaoyang/Xicheng/Dongcheng/Haidian）的
+小规模抽样子集（供CLI命令功能验收测试快速跑通训练闭环，非最终精度评估）：
+train 80 张 / val 20 张，共 100 张，标注对象总数 263 个。
+原始格式为Ultralytics YOLO txt（每张图一个txt，每行 `class_id x_center y_center w h` 归一化坐标），图片均为 1024x1024 RGB。
+共7个类别（本次抽样子集中的实际实例数）: Longitudinal Crack(65), Transverse Crack(31), Alligator Crack(27), Pothole(8), Longitudinal Patch(46), Transverse Patch(54), Manhole Cover(32)。
+完整数据集（未抽样）共7000张/18232个标注对象，位于 /home/dataset1/gaojing/uautoresearchX/
+的 SVRDD_YOLO 目录，本次仅用于CLI功能验证，后续若要提升精度应换回全量数据集
+（重新运行 `tools/prepare_svrdd_records.py` 不加抽样）并增加训练轮次。
